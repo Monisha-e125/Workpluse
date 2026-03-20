@@ -266,14 +266,14 @@ Project ──┬──< Task
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/workpulse-ai.git
+git clone https://github.com/Monisha-e125/workpulse-ai.git
 cd workpulse-ai
 
 # 2. Setup Backend
 cd server
 cp .env.example .env          # Edit .env with your values
 npm install
-npm run dev                    # Starts on http://localhost:5000
+npm run dev                    # Starts on http://localhost:5001
 
 # 3. Setup Frontend (new terminal)
 cd client
@@ -283,7 +283,7 @@ npm run dev                    # Starts on http://localhost:5173
 
 Environment Variables
 NODE_ENV=development
-PORT=5000
+PORT=5001
 MONGODB_URI=mongodb://localhost:27017/workpulse-ai
 JWT_SECRET=your_jwt_secret_key
 JWT_EXPIRE=7d
@@ -297,8 +297,8 @@ SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
 
 Client 
-VITE_API_URL=http://localhost:5000/api/v1
-VITE_SOCKET_URL=http://localhost:5000
+VITE_API_URL=http://localhost:5001/api/v1
+VITE_SOCKET_URL=http://localhost:5001
 
 Docker Setup
 # Run everything with Docker Compose
@@ -306,11 +306,11 @@ docker-compose up -d
 
 # Access:
 # Frontend: http://localhost:80
-# Backend:  http://localhost:5000
+# Backend:  http://localhost:5001
 # MongoDB:  localhost:27017
 # Redis:    localhost:6379
 📡 API Documentation
-Base URL: http://localhost:5000/api/v1
+Base URL: http://localhost:5001/api/v1
 Authentication APIs
 Method	Endpoint	Description
 POST	/auth/register	Register new user
@@ -493,30 +493,8 @@ workpulse-ai/
 └── README.md
 Total: 350+ files | 50+ API endpoints | 12+ feature modules
 
-🚀 Deployment
-Free Deployment Stack
-Service	Platform	Free Tier
-Database	MongoDB Atlas	512MB
-Backend	Render.com	750 hours/month
-Frontend	Vercel	Unlimited
-Redis	Upstash	10K requests/day
-Files	Cloudinary	25GB
-Deploy Steps
-MongoDB Atlas — Create free cluster at cloud.mongodb.com
-Backend — Deploy to Render.com (connect GitHub repo)
-Frontend — Deploy to Vercel (import GitHub repo)
-Update env — Set production URLs in environment variables
-🔮 Future Enhancements
- GitHub/GitLab integration for commit tracking
- Video conferencing (WebRTC)
- Mobile app (React Native)
- Advanced AI with ML model training
- Gantt chart view
- Time tracking
- Custom workflows
- API webhooks
- Slack/Discord integration
- Multi-language support
+
+ 
 🤝 Contributing
 Contributions are welcome! Please follow these steps:
 
@@ -529,12 +507,11 @@ Open a Pull Request
 This project is licensed under the MIT License — see the LICENSE file for details.
 
 👨‍💻 Author
-Your Name
+Monisha E
 
-🌐 Portfolio: your-portfolio.com
-💼 LinkedIn: linkedin.com/in/yourprofile
-🐙 GitHub: github.com/yourusername
-📧 Email: your.email@example.com
+💼 LinkedIn: https://www.linkedin.com/in/monisha-e-000a59332/
+🐙 GitHub: https://github.com/Monisha-e125/Workpluse
+📧 Email: monishae2830@gmail.com
 ⭐ Show Your Support
 If you found this project useful, please consider giving it a ⭐ on GitHub!
 
