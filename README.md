@@ -18,7 +18,7 @@
   <a href="#-features">Features</a> •
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-installation">Installation</a> •
-  <a href="#-screenshots">Screenshots</a> •
+  
   <a href="#-api-documentation">API Docs</a> •
   <a href="#-architecture">Architecture</a>
 </p>
