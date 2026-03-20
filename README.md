@@ -37,7 +37,7 @@
 - [Database Schema](#-database-schema)
 - [Installation](#-installation)
 - [API Documentation](#-api-documentation)
-- [Screenshots](#-screenshots)
+
 - [AI Algorithms](#-ai-algorithms)
 - [Real-Time Features](#-real-time-features)
 - [Project Structure](#-project-structure)
