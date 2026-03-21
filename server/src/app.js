@@ -10,6 +10,7 @@ const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const sprintRoutes = require('./routes/sprintRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+
 // ═══ Import Routes ═══
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -18,7 +19,6 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const moodRoutes = require('./routes/moodRoutes');
 const standupRoutes = require('./routes/standupRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
-
 
 const app = express();
 
@@ -31,9 +31,13 @@ app.use(
   })
 );
 
+// ✅ FIXED CORS CONFIG
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: [
+      'http://localhost:5173',
+      'https://workpluse.vercel.app'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -90,43 +94,12 @@ app.use('/api/v1/mood', moodRoutes);
 app.use('/api/v1/standups', standupRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 
-// Future routes (Week 4+):
-// app.use('/api/v1/projects', projectRoutes);
-// app.use('/api/v1/tasks', taskRoutes);
-// app.use('/api/v1/ai', aiRoutes);
-// app.use('/api/v1/mood', moodRoutes);
-// app.use('/api/v1/standups', standupRoutes);
-// app.use('/api/v1/analytics', analyticsRoutes);
-// app.use('/api/v1/notifications', notificationRoutes);
-// app.use('/api/v1/chat', chatRoutes);
-
 // API Info
 app.get('/api/v1', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Welcome to WorkPulse AI API v1',
-    version: '1.0.0',
-    endpoints: {
-      health: 'GET /api/health',
-      auth: {
-        register: 'POST /api/v1/auth/register',
-        login: 'POST /api/v1/auth/login',
-        logout: 'POST /api/v1/auth/logout',
-        me: 'GET /api/v1/auth/me',
-        updateProfile: 'PUT /api/v1/auth/profile',
-        changePassword: 'PUT /api/v1/auth/change-password',
-        forgotPassword: 'POST /api/v1/auth/forgot-password',
-        resetPassword: 'POST /api/v1/auth/reset-password/:token',
-        refreshToken: 'POST /api/v1/auth/refresh-token'
-      },
-      users: {
-        list: 'GET /api/v1/users',
-        search: 'GET /api/v1/users/search?q=',
-        getById: 'GET /api/v1/users/:id',
-        updateRole: 'PUT /api/v1/users/:id/role',
-        updateSkills: 'PUT /api/v1/users/skills'
-      }
-    }
+    version: '1.0.0'
   });
 });
 
