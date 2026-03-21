@@ -22,7 +22,7 @@ import ProjectDetail from './pages/Projects/ProjectDetail';
 import MyTasks from './pages/Tasks/MyTasks';
 
 // Chat & Notifications (Week 6-7)
-import ProjectChat from './pages/Chat/ProjectChat';
+import ProjectChat from './pages/chat/ProjectChat';
 import NotificationCenter from './pages/Notifications/NotificationCenter';
 import TeamMembers from './pages/Team/TeamMembers';
 
