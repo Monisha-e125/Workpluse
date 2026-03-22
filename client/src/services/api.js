@@ -1,9 +1,11 @@
 import axios from 'axios';
 
-// Create Axios instance
+// ═══════════════════════════════════════════
+// ✅ Create Axios instance
+// ═══════════════════════════════════════════
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api/v1',
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   },
@@ -23,7 +25,7 @@ api.interceptors.request.use(
 
     // Log requests in development
     if (import.meta.env.DEV) {
-      console.log(`📡 ${config.method?.toUpperCase()} ${config.url}`);
+      console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     }
 
     return config;
@@ -37,12 +39,10 @@ api.interceptors.request.use(
 // RESPONSE INTERCEPTOR
 // ═══════════════════════════════════════════
 api.interceptors.response.use(
-  // Success handler
   (response) => {
     return response;
   },
 
-  // Error handler
   async (error) => {
     const originalRequest = error.config;
 
@@ -51,7 +51,6 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Attempt to refresh token
         const refreshResponse = await axios.post(
           `${api.defaults.baseURL}/auth/refresh-token`,
           {},
@@ -60,18 +59,15 @@ api.interceptors.response.use(
 
         const { accessToken } = refreshResponse.data.data;
 
-        // Save new token
         localStorage.setItem('accessToken', accessToken);
 
-        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed — logout user
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
 
-        // Redirect to login (avoid redirect loop)
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
@@ -82,18 +78,18 @@ api.interceptors.response.use(
 
     // ── Handle 403 Forbidden ──
     if (error.response?.status === 403) {
-      console.error('🚫 Access forbidden:', error.response.data.message);
+      console.error('🚫 Access forbidden:', error.response.data?.message);
     }
 
     // ── Handle 429 Too Many Requests ──
     if (error.response?.status === 429) {
-      console.error('⚠️ Rate limited:', error.response.data.message);
+      console.error('⚠️ Rate limited:', error.response.data?.message);
     }
 
     // ── Handle Network Errors ──
     if (!error.response) {
-      console.error('🌐 Network error — server might be down');
-      error.message = 'Network error. Please check your connection.';
+      console.error('🌐 Network error — server might be starting up (Render free tier takes ~30s)');
+      error.message = 'Network error. Server might be starting up, please try again in 30 seconds.';
     }
 
     return Promise.reject(error);

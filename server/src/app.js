@@ -31,18 +31,36 @@ app.use(
   })
 );
 
+// ═══════════════════════════════════════════
 // ✅ FIXED CORS CONFIG
+// ═══════════════════════════════════════════
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://workpluse.vercel.app',
+  'https://www.workpluse.vercel.app'
+];
+
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      'https://workpluse.vercel.app'
-    ],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn(`CORS blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   })
 );
+
+// ✅ Handle preflight requests explicitly
+app.options('*', cors());
 
 app.use('/api/', apiLimiter);
 
@@ -67,6 +85,19 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ═══════════════════════════════════════════
+// ✅ ROOT ROUTE (MOVED HERE — BEFORE 404 HANDLER)
+// ═══════════════════════════════════════════
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: '🚀 WorkPulse AI API is running successfully!',
+    version: '1.0.0',
+    docs: '/api/v1',
+    health: '/api/health'
+  });
+});
+
+// ═══════════════════════════════════════════
 // HEALTH CHECK
 // ═══════════════════════════════════════════
 app.get('/api/health', (req, res) => {
@@ -80,7 +111,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// API ROUTES
+// API ROUTES — all under /api/v1
 // ═══════════════════════════════════════════
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
@@ -99,12 +130,25 @@ app.get('/api/v1', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Welcome to WorkPulse AI API v1',
-    version: '1.0.0'
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/v1/auth',
+      users: '/api/v1/users',
+      projects: '/api/v1/projects',
+      tasks: '/api/v1/tasks',
+      sprints: '/api/v1/sprints',
+      chat: '/api/v1/chat',
+      notifications: '/api/v1/notifications',
+      ai: '/api/v1/ai',
+      mood: '/api/v1/mood',
+      standups: '/api/v1/standups',
+      analytics: '/api/v1/analytics'
+    }
   });
 });
 
 // ═══════════════════════════════════════════
-// 404 HANDLER
+// 404 HANDLER (must be LAST route)
 // ═══════════════════════════════════════════
 app.all('*', (req, res, next) => {
   next(new AppError(`Route ${req.method} ${req.originalUrl} not found`, 404));

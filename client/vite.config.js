@@ -20,6 +20,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // ✅ Proxy ONLY works in local dev, NOT on Vercel
     proxy: {
       '/api': {
         target: 'http://localhost:5001',

@@ -73,8 +73,5 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
-app.get("/", (req, res) => {
-  res.send("🚀 Workpluse API is running successfully");
-});
 
 startServer();
