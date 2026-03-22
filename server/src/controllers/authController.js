@@ -1,22 +1,57 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const ApiResponse = require('../utils/apiResponse');
-const EmailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
 // ═══════════════════════════════════════════
-// ✅ FIXED COOKIE OPTIONS FOR CROSS-DOMAIN
+// ✅ Safe EmailService import — NEVER crashes
+// ═══════════════════════════════════════════
+let EmailService;
+try {
+  EmailService = require('../services/emailService');
+  logger.info('✅ EmailService loaded');
+} catch (error) {
+  logger.warn(`⚠️ EmailService not available: ${error.message}`);
+  EmailService = {
+    sendWelcomeEmail: async () => logger.info('📧 [SKIP] Welcome email'),
+    sendPasswordResetEmail: async () => logger.info('📧 [SKIP] Reset email'),
+    sendPasswordChangedEmail: async () => logger.info('📧 [SKIP] Password changed email')
+  };
+}
+
+// ═══════════════════════════════════════════
+// ✅ Cookie options for cross-domain (Vercel ↔ Render)
 // ═══════════════════════════════════════════
 const getCookieOptions = (maxAge) => {
   const isProduction = process.env.NODE_ENV === 'production';
-
   return {
     httpOnly: true,
-    secure: isProduction, // true in production (HTTPS)
-    sameSite: isProduction ? 'none' : 'lax', // ✅ 'none' for cross-domain (Vercel↔Render)
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge,
     path: '/'
   };
+};
+
+// ═══════════════════════════════════════════
+// ✅ Safe token generator — catches missing secrets
+// ═══════════════════════════════════════════
+const generateTokens = (user) => {
+  const jwtSecret = process.env.JWT_SECRET;
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET environment variable is not set');
+  }
+  if (!jwtRefreshSecret) {
+    throw new Error('JWT_REFRESH_SECRET environment variable is not set');
+  }
+
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  return { accessToken, refreshToken };
 };
 
 // ═══════════════════════════════════════════
@@ -26,27 +61,60 @@ exports.register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role, skills } = req.body;
 
+    logger.info(`📝 Register attempt: ${email}`);
+
+    // Validate required fields manually (backup for validator)
+    if (!firstName || !lastName || !email || !password) {
+      return ApiResponse.badRequest(res, 'First name, last name, email, and password are required');
+    }
+
     // Check if email already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
+      logger.warn(`⚠️ Registration conflict — email exists: ${email}`);
       return ApiResponse.conflict(res, 'An account with this email already exists');
     }
 
     // Create user
-    const user = await User.create({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      role: role || 'developer',
-      skills: skills || []
-    });
+    let user;
+    try {
+      user = await User.create({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.toLowerCase().trim(),
+        password,
+        role: role || 'developer',
+        skills: skills || []
+      });
+      logger.info(`✅ User created in DB: ${email}`);
+    } catch (createError) {
+      logger.error(`❌ User creation failed: ${createError.message}`);
+
+      if (createError.code === 11000) {
+        return ApiResponse.conflict(res, 'An account with this email already exists');
+      }
+      if (createError.name === 'ValidationError') {
+        const messages = Object.values(createError.errors).map((e) => e.message);
+        return ApiResponse.badRequest(res, messages.join('. '));
+      }
+      throw createError;
+    }
 
     // Generate tokens
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    let accessToken, refreshToken;
+    try {
+      const tokens = generateTokens(user);
+      accessToken = tokens.accessToken;
+      refreshToken = tokens.refreshToken;
+      logger.info(`✅ Tokens generated for: ${email}`);
+    } catch (tokenError) {
+      logger.error(`❌ Token generation failed: ${tokenError.message}`);
+      // Delete the user since we can't complete registration
+      await User.findByIdAndDelete(user._id);
+      return ApiResponse.error(res, 'Server configuration error. Please contact admin.');
+    }
 
-    // Save refresh token to database
+    // Save refresh token
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
     user.loginCount = 1;
@@ -56,36 +124,30 @@ exports.register = async (req, res) => {
     res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
     res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
-    // Send welcome email (async — don't block response)
+    // Send welcome email — fire and forget
     try {
-      EmailService.sendWelcomeEmail(user);
+      if (EmailService && EmailService.sendWelcomeEmail) {
+        EmailService.sendWelcomeEmail(user).catch((err) =>
+          logger.warn(`⚠️ Welcome email async error: ${err.message}`)
+        );
+      }
     } catch (emailErr) {
-      logger.warn(`Welcome email failed for ${email}: ${emailErr.message}`);
+      logger.warn(`⚠️ Email service error: ${emailErr.message}`);
     }
 
-    // Get safe user object
     const safeUser = user.toSafeObject();
 
-    logger.info(`✅ New user registered: ${email} (${role || 'developer'})`);
+    logger.info(`✅ Registration complete: ${email}`);
 
     return ApiResponse.created(
       res,
-      {
-        user: safeUser,
-        accessToken,
-        refreshToken
-      },
+      { user: safeUser, accessToken, refreshToken },
       'Registration successful! Welcome to WorkPulse AI.'
     );
   } catch (error) {
-    logger.error(`Registration error: ${error.message}`);
-
-    // Handle mongoose duplicate key error
-    if (error.code === 11000) {
-      return ApiResponse.conflict(res, 'An account with this email already exists');
-    }
-
-    return ApiResponse.error(res, error.message);
+    logger.error(`❌ Registration error: ${error.message}`);
+    logger.error(`❌ Stack: ${error.stack}`);
+    return ApiResponse.error(res, 'Registration failed. Please try again.');
   }
 };
 
@@ -96,30 +158,49 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user with password field
+    logger.info(`🔐 Login attempt: ${email}`);
+
+    if (!email || !password) {
+      return ApiResponse.badRequest(res, 'Email and password are required');
+    }
+
+    // Find user with password
     const user = await User.findByEmail(email);
 
     if (!user) {
+      logger.warn(`❌ Login failed — user not found: ${email}`);
       return ApiResponse.unauthorized(res, 'Invalid email or password');
     }
 
-    // Check if account is active
+    // Check active
     if (!user.isActive) {
-      return ApiResponse.unauthorized(
-        res,
-        'Your account has been deactivated. Please contact an administrator.'
-      );
+      return ApiResponse.unauthorized(res, 'Your account has been deactivated.');
     }
 
     // Verify password
-    const isPasswordValid = await user.comparePassword(password);
+    let isPasswordValid;
+    try {
+      isPasswordValid = await user.comparePassword(password);
+    } catch (compareErr) {
+      logger.error(`❌ Password compare error: ${compareErr.message}`);
+      return ApiResponse.error(res, 'Login failed. Please try again.');
+    }
+
     if (!isPasswordValid) {
+      logger.warn(`❌ Login failed — wrong password: ${email}`);
       return ApiResponse.unauthorized(res, 'Invalid email or password');
     }
 
     // Generate tokens
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    let accessToken, refreshToken;
+    try {
+      const tokens = generateTokens(user);
+      accessToken = tokens.accessToken;
+      refreshToken = tokens.refreshToken;
+    } catch (tokenError) {
+      logger.error(`❌ Token generation failed: ${tokenError.message}`);
+      return ApiResponse.error(res, 'Server configuration error. Please contact admin.');
+    }
 
     // Update user
     user.refreshToken = refreshToken;
@@ -133,20 +214,17 @@ exports.login = async (req, res) => {
 
     const safeUser = user.toSafeObject();
 
-    logger.info(`✅ User logged in: ${email}`);
+    logger.info(`✅ Login successful: ${email}`);
 
     return ApiResponse.success(
       res,
-      {
-        user: safeUser,
-        accessToken,
-        refreshToken
-      },
+      { user: safeUser, accessToken, refreshToken },
       'Login successful!'
     );
   } catch (error) {
-    logger.error(`Login error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    logger.error(`❌ Login error: ${error.message}`);
+    logger.error(`❌ Stack: ${error.stack}`);
+    return ApiResponse.error(res, 'Login failed. Please try again.');
   }
 };
 
@@ -155,39 +233,30 @@ exports.login = async (req, res) => {
 // ═══════════════════════════════════════════
 exports.logout = async (req, res) => {
   try {
-    // Clear refresh token in database
-    await User.findByIdAndUpdate(req.user._id, {
-      refreshToken: ''
-    });
+    await User.findByIdAndUpdate(req.user._id, { refreshToken: '' });
 
-    // Clear cookies
     res.cookie('accessToken', '', { ...getCookieOptions(0), maxAge: 0 });
     res.cookie('refreshToken', '', { ...getCookieOptions(0), maxAge: 0 });
 
     logger.info(`✅ User logged out: ${req.user.email}`);
-
     return ApiResponse.success(res, null, 'Logged out successfully');
   } catch (error) {
     logger.error(`Logout error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    return ApiResponse.error(res, 'Logout failed');
   }
 };
 
 // ═══════════════════════════════════════════
-// GET CURRENT USER (ME)
+// GET ME
 // ═══════════════════════════════════════════
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-
-    if (!user) {
-      return ApiResponse.notFound(res, 'User not found');
-    }
-
+    if (!user) return ApiResponse.notFound(res, 'User not found');
     return ApiResponse.success(res, user.toSafeObject(), 'Profile fetched successfully');
   } catch (error) {
     logger.error(`Get me error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    return ApiResponse.error(res, 'Failed to fetch profile');
   }
 };
 
@@ -197,25 +266,14 @@ exports.getMe = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const allowedFields = [
-      'firstName',
-      'lastName',
-      'avatar',
-      'bio',
-      'phone',
-      'location',
-      'department',
-      'designation',
-      'skills',
-      'workingHours',
-      'socialLinks',
-      'preferences'
+      'firstName', 'lastName', 'avatar', 'bio', 'phone',
+      'location', 'department', 'designation', 'skills',
+      'workingHours', 'socialLinks', 'preferences'
     ];
 
     const updates = {};
     allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
-      }
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
     if (Object.keys(updates).length === 0) {
@@ -227,20 +285,13 @@ exports.updateProfile = async (req, res) => {
       runValidators: true
     });
 
-    if (!user) {
-      return ApiResponse.notFound(res, 'User not found');
-    }
+    if (!user) return ApiResponse.notFound(res, 'User not found');
 
     logger.info(`✅ Profile updated: ${user.email}`);
-
-    return ApiResponse.success(
-      res,
-      user.toSafeObject(),
-      'Profile updated successfully'
-    );
+    return ApiResponse.success(res, user.toSafeObject(), 'Profile updated successfully');
   } catch (error) {
     logger.error(`Update profile error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    return ApiResponse.error(res, 'Failed to update profile');
   }
 };
 
@@ -252,45 +303,36 @@ exports.changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
     const user = await User.findById(req.user._id).select('+password');
+    if (!user) return ApiResponse.notFound(res, 'User not found');
 
-    if (!user) {
-      return ApiResponse.notFound(res, 'User not found');
-    }
-
-    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
-    if (!isCurrentPasswordValid) {
-      return ApiResponse.badRequest(res, 'Current password is incorrect');
-    }
+    const isValid = await user.comparePassword(currentPassword);
+    if (!isValid) return ApiResponse.badRequest(res, 'Current password is incorrect');
 
     user.password = newPassword;
     user.refreshToken = '';
     await user.save();
 
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
-
-    user.refreshToken = refreshToken;
+    const tokens = generateTokens(user);
+    user.refreshToken = tokens.refreshToken;
     await user.save({ validateBeforeSave: false });
 
-    res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
+    res.cookie('accessToken', tokens.accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie('refreshToken', tokens.refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
     try {
       EmailService.sendPasswordChangedEmail(user);
-    } catch (emailErr) {
-      logger.warn(`Password changed email failed: ${emailErr.message}`);
+    } catch (e) {
+      logger.warn(`Password change email failed: ${e.message}`);
     }
 
     logger.info(`✅ Password changed: ${user.email}`);
-
-    return ApiResponse.success(
-      res,
-      { accessToken, refreshToken },
-      'Password changed successfully. All other sessions have been logged out.'
-    );
+    return ApiResponse.success(res, {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    }, 'Password changed successfully.');
   } catch (error) {
     logger.error(`Change password error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    return ApiResponse.error(res, 'Failed to change password');
   }
 };
 
@@ -301,14 +343,17 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    if (!email) {
+      return ApiResponse.badRequest(res, 'Email is required');
+    }
+
     const user = await User.findOne({ email: email.toLowerCase() });
 
+    // Always return same message (security)
+    const successMsg = 'If an account exists with this email, a password reset link has been sent.';
+
     if (!user) {
-      return ApiResponse.success(
-        res,
-        null,
-        'If an account exists with this email, a password reset link has been sent.'
-      );
+      return ApiResponse.success(res, null, successMsg);
     }
 
     const resetToken = user.generatePasswordResetToken();
@@ -320,23 +365,14 @@ exports.forgotPassword = async (req, res) => {
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
       await user.save({ validateBeforeSave: false });
-
-      return ApiResponse.error(
-        res,
-        'Failed to send reset email. Please try again later.'
-      );
+      return ApiResponse.error(res, 'Failed to send reset email. Please try again.');
     }
 
     logger.info(`✅ Password reset email sent to: ${email}`);
-
-    return ApiResponse.success(
-      res,
-      null,
-      'If an account exists with this email, a password reset link has been sent.'
-    );
+    return ApiResponse.success(res, null, successMsg);
   } catch (error) {
     logger.error(`Forgot password error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    return ApiResponse.error(res, 'Failed to process request');
   }
 };
 
@@ -356,10 +392,7 @@ exports.resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return ApiResponse.badRequest(
-        res,
-        'Password reset token is invalid or has expired'
-      );
+      return ApiResponse.badRequest(res, 'Token is invalid or has expired');
     }
 
     user.password = password;
@@ -368,29 +401,23 @@ exports.resetPassword = async (req, res) => {
     user.refreshToken = '';
     await user.save();
 
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
-
-    user.refreshToken = refreshToken;
+    const tokens = generateTokens(user);
+    user.refreshToken = tokens.refreshToken;
     await user.save({ validateBeforeSave: false });
 
-    res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
+    res.cookie('accessToken', tokens.accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie('refreshToken', tokens.refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
     logger.info(`✅ Password reset successful: ${user.email}`);
 
-    return ApiResponse.success(
-      res,
-      {
-        user: user.toSafeObject(),
-        accessToken,
-        refreshToken
-      },
-      'Password reset successful!'
-    );
+    return ApiResponse.success(res, {
+      user: user.toSafeObject(),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    }, 'Password reset successful!');
   } catch (error) {
     logger.error(`Reset password error: ${error.message}`);
-    return ApiResponse.error(res, error.message);
+    return ApiResponse.error(res, 'Failed to reset password');
   }
 };
 
@@ -408,12 +435,14 @@ exports.refreshToken = async (req, res) => {
       return ApiResponse.unauthorized(res, 'Refresh token is required');
     }
 
+    if (!process.env.JWT_REFRESH_SECRET) {
+      logger.error('❌ JWT_REFRESH_SECRET not set!');
+      return ApiResponse.error(res, 'Server configuration error');
+    }
+
     let decoded;
     try {
-      decoded = require('jsonwebtoken').verify(
-        token,
-        process.env.JWT_REFRESH_SECRET
-      );
+      decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
     } catch {
       return ApiResponse.unauthorized(res, 'Invalid or expired refresh token');
     }
@@ -421,33 +450,24 @@ exports.refreshToken = async (req, res) => {
     const user = await User.findById(decoded.id).select('+refreshToken');
 
     if (!user || user.refreshToken !== token) {
-      return ApiResponse.unauthorized(
-        res,
-        'Invalid refresh token. Please login again.'
-      );
+      return ApiResponse.unauthorized(res, 'Invalid refresh token. Please login again.');
     }
 
     if (!user.isActive) {
       return ApiResponse.unauthorized(res, 'Account has been deactivated');
     }
 
-    const newAccessToken = user.generateAccessToken();
-    const newRefreshToken = user.generateRefreshToken();
-
-    user.refreshToken = newRefreshToken;
+    const tokens = generateTokens(user);
+    user.refreshToken = tokens.refreshToken;
     await user.save({ validateBeforeSave: false });
 
-    res.cookie('accessToken', newAccessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.cookie('refreshToken', newRefreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
+    res.cookie('accessToken', tokens.accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie('refreshToken', tokens.refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
-    return ApiResponse.success(
-      res,
-      {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken
-      },
-      'Token refreshed successfully'
-    );
+    return ApiResponse.success(res, {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    }, 'Token refreshed successfully');
   } catch (error) {
     logger.error(`Refresh token error: ${error.message}`);
     return ApiResponse.unauthorized(res, 'Token refresh failed');

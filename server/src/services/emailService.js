@@ -1,11 +1,31 @@
-const { sendEmail } = require('../config/email');
-const {
-  welcomeEmail,
-  passwordResetEmail,
-  projectInviteEmail,
-  burnoutAlertEmail
-} = require('../utils/emailTemplates');
 const logger = require('../utils/logger');
+
+// ✅ Safe imports — never crash
+let sendEmail;
+let emailTemplates;
+
+try {
+  const emailConfig = require('../config/email');
+  sendEmail = emailConfig.sendEmail;
+} catch (error) {
+  logger.warn(`⚠️ Email config not available: ${error.message}`);
+  sendEmail = async ({ to, subject }) => {
+    logger.info(`📧 [MOCK] Email to ${to}: ${subject}`);
+    return { messageId: 'mock' };
+  };
+}
+
+try {
+  emailTemplates = require('../utils/emailTemplates');
+} catch (error) {
+  logger.warn(`⚠️ Email templates not available: ${error.message}`);
+  emailTemplates = {
+    welcomeEmail: (name) => `<p>Welcome ${name}!</p>`,
+    passwordResetEmail: (name, url) => `<p>Hi ${name}, reset: ${url}</p>`,
+    projectInviteEmail: () => '<p>Project invite</p>',
+    burnoutAlertEmail: () => '<p>Burnout alert</p>'
+  };
+}
 
 class EmailService {
   /**
@@ -13,7 +33,7 @@ class EmailService {
    */
   static async sendWelcomeEmail(user) {
     try {
-      const html = welcomeEmail(user.firstName);
+      const html = emailTemplates.welcomeEmail(user.firstName);
 
       await sendEmail({
         to: user.email,
@@ -22,9 +42,9 @@ class EmailService {
         text: `Welcome to WorkPulse AI, ${user.firstName}! Your account has been created successfully.`
       });
 
-      logger.info(`Welcome email sent to ${user.email}`);
+      logger.info(`✅ Welcome email sent to ${user.email}`);
     } catch (error) {
-      logger.error(`Failed to send welcome email to ${user.email}: ${error.message}`);
+      logger.warn(`⚠️ Welcome email failed for ${user.email}: ${error.message}`);
       // Don't throw — email failure shouldn't block registration
     }
   }
@@ -34,8 +54,8 @@ class EmailService {
    */
   static async sendPasswordResetEmail(user, resetToken) {
     try {
-      const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-      const html = passwordResetEmail(user.firstName, resetUrl);
+      const resetUrl = `${process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://workpluse.vercel.app'}/reset-password/${resetToken}`;
+      const html = emailTemplates.passwordResetEmail(user.firstName, resetUrl);
 
       await sendEmail({
         to: user.email,
@@ -44,11 +64,9 @@ class EmailService {
         text: `Hi ${user.firstName}, reset your password here: ${resetUrl}. This link expires in 10 minutes.`
       });
 
-      logger.info(`Password reset email sent to ${user.email}`);
+      logger.info(`✅ Password reset email sent to ${user.email}`);
     } catch (error) {
-      logger.error(
-        `Failed to send password reset email to ${user.email}: ${error.message}`
-      );
+      logger.error(`❌ Password reset email failed for ${user.email}: ${error.message}`);
       throw new Error('Failed to send password reset email. Please try again later.');
     }
   }
@@ -58,8 +76,8 @@ class EmailService {
    */
   static async sendProjectInviteEmail(inviter, inviteeEmail, project, role) {
     try {
-      const inviteUrl = `${process.env.CLIENT_URL}/projects/${project._id}`;
-      const html = projectInviteEmail(
+      const inviteUrl = `${process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://workpluse.vercel.app'}/projects/${project._id}`;
+      const html = emailTemplates.projectInviteEmail(
         inviter.fullName,
         project.name,
         role,
@@ -70,14 +88,12 @@ class EmailService {
         to: inviteeEmail,
         subject: `📧 You've been invited to ${project.name} — WorkPulse AI`,
         html,
-        text: `${inviter.fullName} has invited you to join "${project.name}" as ${role}. View: ${inviteUrl}`
+        text: `${inviter.fullName} has invited you to join "${project.name}" as ${role}.`
       });
 
-      logger.info(`Project invite email sent to ${inviteeEmail}`);
+      logger.info(`✅ Project invite email sent to ${inviteeEmail}`);
     } catch (error) {
-      logger.error(
-        `Failed to send invite email to ${inviteeEmail}: ${error.message}`
-      );
+      logger.warn(`⚠️ Invite email failed for ${inviteeEmail}: ${error.message}`);
     }
   }
 
@@ -86,7 +102,7 @@ class EmailService {
    */
   static async sendBurnoutAlertEmail(manager, developer, riskScore, riskLevel) {
     try {
-      const html = burnoutAlertEmail(
+      const html = emailTemplates.burnoutAlertEmail(
         manager.firstName,
         developer.fullName,
         riskScore,
@@ -100,11 +116,9 @@ class EmailService {
         text: `Burnout alert: ${developer.fullName} has a ${riskLevel} risk score of ${riskScore}/100.`
       });
 
-      logger.info(`Burnout alert email sent to manager ${manager.email}`);
+      logger.info(`✅ Burnout alert sent to ${manager.email}`);
     } catch (error) {
-      logger.error(
-        `Failed to send burnout alert to ${manager.email}: ${error.message}`
-      );
+      logger.warn(`⚠️ Burnout alert email failed: ${error.message}`);
     }
   }
 
@@ -120,9 +134,9 @@ class EmailService {
         text: `Hi ${user.firstName}, your password has been changed successfully.`
       });
 
-      logger.info(`Password changed email sent to ${user.email}`);
+      logger.info(`✅ Password changed email sent to ${user.email}`);
     } catch (error) {
-      logger.error(`Failed to send password changed email: ${error.message}`);
+      logger.warn(`⚠️ Password changed email failed: ${error.message}`);
     }
   }
 }

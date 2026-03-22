@@ -1,238 +1,167 @@
 /**
- * Email HTML Templates for WorkPulse AI
+ * Email Templates — HTML generators
  */
 
-// Base template wrapper
-const baseTemplate = (content) => `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WorkPulse AI</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #0f172a;
-      color: #e2e8f0;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .card {
-      background-color: #1e293b;
-      border-radius: 12px;
-      padding: 32px;
-      margin: 20px 0;
-      border: 1px solid #334155;
-    }
-    .logo {
-      text-align: center;
-      padding: 20px 0;
-    }
-    .logo h1 {
-      color: #818cf8;
-      font-size: 28px;
-      margin: 0;
-    }
-    .logo span {
-      color: #6366f1;
-    }
-    h2 {
-      color: #f1f5f9;
-      font-size: 22px;
-      margin-bottom: 16px;
-    }
-    p {
-      color: #94a3b8;
-      font-size: 15px;
-      line-height: 1.6;
-      margin: 8px 0;
-    }
-    .btn {
-      display: inline-block;
-      background-color: #6366f1;
-      color: #ffffff !important;
-      text-decoration: none;
-      padding: 14px 32px;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      margin: 20px 0;
-      text-align: center;
-    }
-    .btn:hover {
-      background-color: #4f46e5;
-    }
-    .footer {
-      text-align: center;
-      padding: 20px;
-      color: #64748b;
-      font-size: 12px;
-    }
-    .highlight {
-      color: #818cf8;
-      font-weight: 600;
-    }
-    .code {
-      background-color: #334155;
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 18px;
-      color: #818cf8;
-      letter-spacing: 4px;
-    }
-    .divider {
-      border-top: 1px solid #334155;
-      margin: 20px 0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="logo">
-      <h1>🚀 Work<span>Pulse</span> AI</h1>
-    </div>
-    <div class="card">
-      ${content}
-    </div>
-    <div class="footer">
-      <p>© ${new Date().getFullYear()} WorkPulse AI. All rights reserved.</p>
-      <p>This email was sent by WorkPulse AI — Intelligent Team Productivity Platform</p>
-    </div>
-  </div>
-</body>
-</html>
-`;
-
-/**
- * Welcome Email
- */
-const welcomeEmail = (userName) => {
-  return baseTemplate(`
-    <h2>Welcome to WorkPulse AI! 🎉</h2>
-    <p>Hi <span class="highlight">${userName}</span>,</p>
-    <p>Your account has been successfully created. You're now part of the
-       most intelligent team productivity platform.</p>
-    <div class="divider"></div>
-    <p>Here's what you can do:</p>
-    <p>📋 Manage projects with real-time Kanban boards</p>
-    <p>🧠 Get AI-powered task assignments</p>
-    <p>🔥 Monitor team burnout risk</p>
-    <p>💚 Track team mood and wellness</p>
-    <p>📊 View powerful analytics dashboards</p>
-    <div class="divider"></div>
-    <div style="text-align: center;">
-      <a href="${process.env.CLIENT_URL}/dashboard" class="btn">Go to Dashboard →</a>
-    </div>
-    <p>Happy building! 🚀</p>
-    <p>— The WorkPulse AI Team</p>
-  `);
+const welcomeEmail = (firstName) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 40px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { font-size: 28px; font-weight: bold; color: #818cf8; }
+        h1 { color: #f1f5f9; font-size: 24px; }
+        p { color: #94a3b8; line-height: 1.6; font-size: 16px; }
+        .btn { display: inline-block; background: #818cf8; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px; }
+        .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Work<span style="color:#a78bfa">Pulse</span> AI</div>
+        </div>
+        <h1>Welcome, ${firstName}! 🎉</h1>
+        <p>Your account has been created successfully. You're now part of the WorkPulse AI team productivity platform.</p>
+        <p>Here's what you can do:</p>
+        <ul style="color: #94a3b8;">
+          <li>📊 Track projects and tasks</li>
+          <li>🤖 Get AI-powered insights</li>
+          <li>💬 Collaborate with your team</li>
+          <li>📈 Monitor productivity analytics</li>
+        </ul>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} WorkPulse AI. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 };
 
-/**
- * Password Reset Email
- */
-const passwordResetEmail = (userName, resetUrl) => {
-  return baseTemplate(`
-    <h2>Password Reset Request 🔐</h2>
-    <p>Hi <span class="highlight">${userName}</span>,</p>
-    <p>We received a request to reset your password. Click the button below
-       to set a new password:</p>
-    <div style="text-align: center;">
-      <a href="${resetUrl}" class="btn">Reset Password →</a>
-    </div>
-    <div class="divider"></div>
-    <p>⚠️ This link will expire in <strong>10 minutes</strong>.</p>
-    <p>If you didn't request this, please ignore this email.
-       Your password will remain unchanged.</p>
-    <p>— The WorkPulse AI Team</p>
-  `);
+const passwordResetEmail = (firstName, resetUrl) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 40px; }
+        .logo { font-size: 28px; font-weight: bold; color: #818cf8; text-align: center; margin-bottom: 30px; }
+        h1 { color: #f1f5f9; font-size: 24px; }
+        p { color: #94a3b8; line-height: 1.6; font-size: 16px; }
+        .btn { display: inline-block; background: #818cf8; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+        .warning { color: #fbbf24; font-size: 14px; }
+        .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">Work<span style="color:#a78bfa">Pulse</span> AI</div>
+        <h1>Password Reset Request 🔐</h1>
+        <p>Hi ${firstName},</p>
+        <p>We received a request to reset your password. Click the button below to create a new password:</p>
+        <div style="text-align: center;">
+          <a href="${resetUrl}" class="btn">Reset Password</a>
+        </div>
+        <p class="warning">⚠️ This link expires in 10 minutes.</p>
+        <p>If you didn't request this, please ignore this email. Your password will remain unchanged.</p>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} WorkPulse AI. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 };
 
-/**
- * Project Invitation Email
- */
 const projectInviteEmail = (inviterName, projectName, role, inviteUrl) => {
-  return baseTemplate(`
-    <h2>You've Been Invited! 🎯</h2>
-    <p><span class="highlight">${inviterName}</span> has invited you to join
-       the project:</p>
-    <h2 style="color: #818cf8; text-align: center;">${projectName}</h2>
-    <p>Your role: <span class="highlight">${role}</span></p>
-    <div style="text-align: center;">
-      <a href="${inviteUrl}" class="btn">Accept Invitation →</a>
-    </div>
-    <div class="divider"></div>
-    <p>If you weren't expecting this invitation, you can safely ignore this email.</p>
-    <p>— The WorkPulse AI Team</p>
-  `);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 40px; }
+        .logo { font-size: 28px; font-weight: bold; color: #818cf8; text-align: center; margin-bottom: 30px; }
+        h1 { color: #f1f5f9; font-size: 24px; }
+        p { color: #94a3b8; line-height: 1.6; font-size: 16px; }
+        .btn { display: inline-block; background: #818cf8; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+        .highlight { color: #818cf8; font-weight: 600; }
+        .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">Work<span style="color:#a78bfa">Pulse</span> AI</div>
+        <h1>Project Invitation 📧</h1>
+        <p><span class="highlight">${inviterName}</span> has invited you to join the project <span class="highlight">"${projectName}"</span> as <span class="highlight">${role}</span>.</p>
+        <div style="text-align: center;">
+          <a href="${inviteUrl}" class="btn">View Project</a>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} WorkPulse AI. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 };
 
-/**
- * Burnout Alert Email (for Managers)
- */
 const burnoutAlertEmail = (managerName, developerName, riskScore, riskLevel) => {
-  const levelEmoji = riskLevel === 'CRITICAL' ? '🚨' :
-    riskLevel === 'HIGH' ? '🔴' : '🟡';
+  const levelColors = {
+    LOW: '#22c55e',
+    MEDIUM: '#eab308',
+    HIGH: '#f97316',
+    CRITICAL: '#ef4444'
+  };
+  const color = levelColors[riskLevel] || '#ef4444';
 
-  return baseTemplate(`
-    <h2>${levelEmoji} Burnout Risk Alert</h2>
-    <p>Hi <span class="highlight">${managerName}</span>,</p>
-    <p>Our AI system has detected a <strong>${riskLevel}</strong> burnout risk for
-       team member <span class="highlight">${developerName}</span>.</p>
-    <div style="text-align: center; margin: 20px 0;">
-      <span class="code">Risk Score: ${riskScore}/100</span>
-    </div>
-    <div class="divider"></div>
-    <p><strong>Recommended Actions:</strong></p>
-    <p>💬 Schedule a 1-on-1 check-in</p>
-    <p>📋 Review their current workload</p>
-    <p>🏖️ Suggest time off if needed</p>
-    <p>📊 Redistribute tasks if overloaded</p>
-    <div style="text-align: center;">
-      <a href="${process.env.CLIENT_URL}/team/burnout" class="btn">
-        View Burnout Dashboard →
-      </a>
-    </div>
-    <p>— WorkPulse AI Engine 🧠</p>
-  `);
-};
-
-/**
- * Weekly Report Email
- */
-const weeklyReportEmail = (userName, stats) => {
-  return baseTemplate(`
-    <h2>📊 Your Weekly Report</h2>
-    <p>Hi <span class="highlight">${userName}</span>,
-       here's your week in review:</p>
-    <div class="divider"></div>
-    <p>✅ Tasks Completed: <span class="highlight">${stats.tasksCompleted}</span></p>
-    <p>📋 Tasks Created: <span class="highlight">${stats.tasksCreated}</span></p>
-    <p>⏱️ Avg Completion Time: <span class="highlight">${stats.avgCompletionTime}</span></p>
-    <p>💚 Mood Average: <span class="highlight">${stats.avgMood}/5</span></p>
-    <p>🔥 Burnout Risk: <span class="highlight">${stats.burnoutLevel}</span></p>
-    <div class="divider"></div>
-    <div style="text-align: center;">
-      <a href="${process.env.CLIENT_URL}/analytics" class="btn">
-        View Full Analytics →
-      </a>
-    </div>
-    <p>Keep up the great work! 🚀</p>
-    <p>— WorkPulse AI</p>
-  `);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 40px; }
+        .logo { font-size: 28px; font-weight: bold; color: #818cf8; text-align: center; margin-bottom: 30px; }
+        h1 { color: #f1f5f9; font-size: 24px; }
+        p { color: #94a3b8; line-height: 1.6; font-size: 16px; }
+        .alert-box { background: #1a1a2e; border: 2px solid ${color}; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
+        .score { font-size: 48px; font-weight: bold; color: ${color}; }
+        .level { font-size: 18px; color: ${color}; font-weight: 600; text-transform: uppercase; }
+        .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">Work<span style="color:#a78bfa">Pulse</span> AI</div>
+        <h1>🚨 Burnout Alert</h1>
+        <p>Hi ${managerName},</p>
+        <p>Our AI has detected a potential burnout risk for <strong>${developerName}</strong>.</p>
+        <div class="alert-box">
+          <div class="score">${riskScore}/100</div>
+          <div class="level">${riskLevel} RISK</div>
+        </div>
+        <p>We recommend scheduling a 1-on-1, adjusting workload, or suggesting time off.</p>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} WorkPulse AI. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 };
 
 module.exports = {
   welcomeEmail,
   passwordResetEmail,
   projectInviteEmail,
-  burnoutAlertEmail,
-  weeklyReportEmail
+  burnoutAlertEmail
 };
