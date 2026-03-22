@@ -1,21 +1,29 @@
 const { validationResult } = require('express-validator');
-const ApiResponse = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
+/**
+ * Validation middleware — runs after express-validator rules
+ * Returns 422 if validation fails
+ */
 const validate = (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
-    const formattedErrors = errors.array().map((err) => ({
-      field: err.path,
+    const extractedErrors = errors.array().map((err) => ({
+      field: err.path || err.param,
       message: err.msg,
       value: err.value
     }));
 
-    // ✅ ADD THIS LOG — shows exactly what's failing
-    console.log('❌ Validation Errors:', JSON.stringify(formattedErrors, null, 2));
-    console.log('📦 Request Body:', JSON.stringify(req.body, null, 2));
+    logger.warn(
+      `Validation failed: ${req.method} ${req.originalUrl} — ${JSON.stringify(extractedErrors)}`
+    );
 
-    return ApiResponse.validationError(res, formattedErrors);
+    return res.status(422).json({
+      success: false,
+      message: 'Validation failed',
+      errors: extractedErrors
+    });
   }
 
   next();

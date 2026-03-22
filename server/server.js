@@ -9,26 +9,20 @@ const { createServer } = require('http');
 
 const PORT = process.env.PORT || 5001;
 
-// Create HTTP server
 const httpServer = createServer(app);
 
-// Initialize Socket.io
 initializeSocket(httpServer);
 
-// Start server
 const startServer = async () => {
   try {
-    // Connect to MongoDB
     await connectDB();
 
-    // Connect to Redis (optional — won't crash if unavailable)
     try {
       await connectRedis();
     } catch (redisError) {
       logger.warn(`⚠️ Redis not available: ${redisError.message}. Running without cache.`);
     }
 
-    // Start listening
     httpServer.listen(PORT, () => {
       logger.info('═══════════════════════════════════════════');
       logger.info(`🚀 WorkPulse AI Server running on port ${PORT}`);
@@ -43,21 +37,16 @@ const startServer = async () => {
   }
 };
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
-  httpServer.close(() => {
-    process.exit(1);
-  });
+  httpServer.close(() => process.exit(1));
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error(`Uncaught Exception: ${error.message}`);
   process.exit(1);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received. Shutting down gracefully...');
   httpServer.close(() => {

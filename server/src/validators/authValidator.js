@@ -1,22 +1,26 @@
 const { body } = require('express-validator');
 
-/**
- * Registration validation rules (SIMPLIFIED)
- */
+// ═══════════════════════════════════════════
+// REGISTER VALIDATION RULES
+// ═══════════════════════════════════════════
 const registerRules = [
   body('firstName')
     .trim()
     .notEmpty()
     .withMessage('First name is required')
     .isLength({ min: 1, max: 50 })
-    .withMessage('First name must be 1-50 characters'),
+    .withMessage('First name must be between 1 and 50 characters')
+    .matches(/^[a-zA-Z\s'-]+$/)
+    .withMessage('First name can only contain letters, spaces, hyphens and apostrophes'),
 
   body('lastName')
     .trim()
     .notEmpty()
     .withMessage('Last name is required')
     .isLength({ min: 1, max: 50 })
-    .withMessage('Last name must be 1-50 characters'),
+    .withMessage('Last name must be between 1 and 50 characters')
+    .matches(/^[a-zA-Z\s'-]+$/)
+    .withMessage('Last name can only contain letters, spaces, hyphens and apostrophes'),
 
   body('email')
     .trim()
@@ -32,25 +36,24 @@ const registerRules = [
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters'),
 
+  // ✅ confirmPassword is optional — frontend sends it but backend ignores it
   body('confirmPassword')
-    .notEmpty()
-    .withMessage('Please confirm your password')
-    .custom((value, { req }) => {
-      if (value !== req.body.password) {
-        throw new Error('Passwords do not match');
-      }
-      return true;
-    }),
+    .optional(),
 
   body('role')
     .optional()
     .isIn(['admin', 'manager', 'developer', 'viewer'])
-    .withMessage('Invalid role specified')
+    .withMessage('Role must be admin, manager, developer, or viewer'),
+
+  body('skills')
+    .optional()
+    .isArray()
+    .withMessage('Skills must be an array')
 ];
 
-/**
- * Login validation rules
- */
+// ═══════════════════════════════════════════
+// LOGIN VALIDATION RULES
+// ═══════════════════════════════════════════
 const loginRules = [
   body('email')
     .trim()
@@ -65,9 +68,9 @@ const loginRules = [
     .withMessage('Password is required')
 ];
 
-/**
- * Forgot password validation
- */
+// ═══════════════════════════════════════════
+// FORGOT PASSWORD RULES
+// ═══════════════════════════════════════════
 const forgotPasswordRules = [
   body('email')
     .trim()
@@ -78,30 +81,20 @@ const forgotPasswordRules = [
     .normalizeEmail()
 ];
 
-/**
- * Reset password validation
- */
+// ═══════════════════════════════════════════
+// RESET PASSWORD RULES
+// ═══════════════════════════════════════════
 const resetPasswordRules = [
   body('password')
     .notEmpty()
     .withMessage('Password is required')
     .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters'),
-
-  body('confirmPassword')
-    .notEmpty()
-    .withMessage('Please confirm your password')
-    .custom((value, { req }) => {
-      if (value !== req.body.password) {
-        throw new Error('Passwords do not match');
-      }
-      return true;
-    })
+    .withMessage('Password must be at least 6 characters')
 ];
 
-/**
- * Change password validation
- */
+// ═══════════════════════════════════════════
+// CHANGE PASSWORD RULES
+// ═══════════════════════════════════════════
 const changePasswordRules = [
   body('currentPassword')
     .notEmpty()
@@ -111,38 +104,33 @@ const changePasswordRules = [
     .notEmpty()
     .withMessage('New password is required')
     .isLength({ min: 6 })
-    .withMessage('New password must be at least 6 characters'),
-
-  body('confirmNewPassword')
-    .notEmpty()
-    .withMessage('Please confirm your new password')
+    .withMessage('New password must be at least 6 characters')
     .custom((value, { req }) => {
-      if (value !== req.body.newPassword) {
-        throw new Error('Passwords do not match');
+      if (value === req.body.currentPassword) {
+        throw new Error('New password must be different from current password');
       }
       return true;
     })
 ];
 
-/**
- * Update profile validation
- */
+// ═══════════════════════════════════════════
+// UPDATE PROFILE RULES
+// ═══════════════════════════════════════════
 const updateProfileRules = [
   body('firstName')
     .optional()
     .trim()
     .isLength({ min: 1, max: 50 })
-    .withMessage('First name must be 1-50 characters'),
+    .withMessage('First name must be between 1 and 50 characters'),
 
   body('lastName')
     .optional()
     .trim()
     .isLength({ min: 1, max: 50 })
-    .withMessage('Last name must be 1-50 characters'),
+    .withMessage('Last name must be between 1 and 50 characters'),
 
   body('bio')
     .optional()
-    .trim()
     .isLength({ max: 300 })
     .withMessage('Bio cannot exceed 300 characters'),
 
@@ -150,17 +138,17 @@ const updateProfileRules = [
     .optional()
     .trim(),
 
+  body('location')
+    .optional()
+    .trim(),
+
   body('department')
     .optional()
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage('Department name too long'),
+    .trim(),
 
   body('designation')
     .optional()
     .trim()
-    .isLength({ max: 100 })
-    .withMessage('Designation too long')
 ];
 
 module.exports = {

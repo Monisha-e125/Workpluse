@@ -32,19 +32,17 @@ app.use(
 );
 
 // ═══════════════════════════════════════════
-// ✅ FIXED CORS CONFIG
+// ✅ CORS CONFIG — Fixed for cross-domain cookies
 // ═══════════════════════════════════════════
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://workpluse.vercel.app',
-  'https://www.workpluse.vercel.app'
+  'https://workpluse.vercel.app'
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -55,11 +53,11 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Refresh-Token']
   })
 );
 
-// ✅ Handle preflight requests explicitly
+// ✅ Handle preflight
 app.options('*', cors());
 
 app.use('/api/', apiLimiter);
@@ -85,15 +83,13 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ═══════════════════════════════════════════
-// ✅ ROOT ROUTE (MOVED HERE — BEFORE 404 HANDLER)
+// ✅ ROOT ROUTE
 // ═══════════════════════════════════════════
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: '🚀 WorkPulse AI API is running successfully!',
-    version: '1.0.0',
-    docs: '/api/v1',
-    health: '/api/health'
+    message: '🚀 WorkPulse AI API is running!',
+    version: '1.0.0'
   });
 });
 
@@ -111,7 +107,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// API ROUTES — all under /api/v1
+// API ROUTES
 // ═══════════════════════════════════════════
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
@@ -130,25 +126,12 @@ app.get('/api/v1', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Welcome to WorkPulse AI API v1',
-    version: '1.0.0',
-    endpoints: {
-      auth: '/api/v1/auth',
-      users: '/api/v1/users',
-      projects: '/api/v1/projects',
-      tasks: '/api/v1/tasks',
-      sprints: '/api/v1/sprints',
-      chat: '/api/v1/chat',
-      notifications: '/api/v1/notifications',
-      ai: '/api/v1/ai',
-      mood: '/api/v1/mood',
-      standups: '/api/v1/standups',
-      analytics: '/api/v1/analytics'
-    }
+    version: '1.0.0'
   });
 });
 
 // ═══════════════════════════════════════════
-// 404 HANDLER (must be LAST route)
+// 404 HANDLER
 // ═══════════════════════════════════════════
 app.all('*', (req, res, next) => {
   next(new AppError(`Route ${req.method} ${req.originalUrl} not found`, 404));

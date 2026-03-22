@@ -1,26 +1,21 @@
 import api from './api';
 
-// ═══════════════════════════════════════════
-// ✅ AUTH SERVICE — All auth API calls
-// ═══════════════════════════════════════════
-// baseURL is already: https://workpluse.onrender.com/api/v1
-// So '/auth/register' becomes: https://workpluse.onrender.com/api/v1/auth/register ✅
-
 const authService = {
   // ── Register ──
   register: (userData) => {
     return api.post('/auth/register', {
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
+      firstName: userData.firstName.trim(),
+      lastName: userData.lastName.trim(),
+      email: userData.email.trim().toLowerCase(),
       password: userData.password
+      // ✅ Don't send confirmPassword to backend
     });
   },
 
   // ── Login ──
   login: (credentials) => {
     return api.post('/auth/login', {
-      email: credentials.email,
+      email: credentials.email.trim().toLowerCase(),
       password: credentials.password
     });
   },
@@ -30,14 +25,14 @@ const authService = {
     return api.post('/auth/logout');
   },
 
-  // ── Get Current User Profile ──
+  // ── Get Current User ──
   getMe: () => {
     return api.get('/auth/me');
   },
 
   // ── Update Profile ──
   updateProfile: (profileData) => {
-    return api.put('/auth/update-profile', profileData);
+    return api.put('/auth/profile', profileData);
   },
 
   // ── Change Password ──
@@ -50,7 +45,8 @@ const authService = {
 
   // ── Refresh Token ──
   refreshToken: () => {
-    return api.post('/auth/refresh-token');
+    const refreshToken = localStorage.getItem('refreshToken');
+    return api.post('/auth/refresh-token', { refreshToken });
   },
 
   // ── Forgot Password ──

@@ -4,13 +4,20 @@ const ApiResponse = require('../utils/apiResponse');
 const EmailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
-// Cookie options
-const getCookieOptions = (maxAge) => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-  maxAge
-});
+// ═══════════════════════════════════════════
+// ✅ FIXED COOKIE OPTIONS FOR CROSS-DOMAIN
+// ═══════════════════════════════════════════
+const getCookieOptions = (maxAge) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProduction, // true in production (HTTPS)
+    sameSite: isProduction ? 'none' : 'lax', // ✅ 'none' for cross-domain (Vercel↔Render)
+    maxAge,
+    path: '/'
+  };
+};
 
 // ═══════════════════════════════════════════
 // REGISTER
@@ -27,9 +34,9 @@ exports.register = async (req, res) => {
 
     // Create user
     const user = await User.create({
-      firstName,
-      lastName,
-      email: email.toLowerCase(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.toLowerCase().trim(),
       password,
       role: role || 'developer',
       skills: skills || []
@@ -46,15 +53,15 @@ exports.register = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // Set cookies
-    res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
-    res.cookie(
-      'refreshToken',
-      refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000) // 30 days
-    );
+    res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
     // Send welcome email (async — don't block response)
-    EmailService.sendWelcomeEmail(user);
+    try {
+      EmailService.sendWelcomeEmail(user);
+    } catch (emailErr) {
+      logger.warn(`Welcome email failed for ${email}: ${emailErr.message}`);
+    }
 
     // Get safe user object
     const safeUser = user.toSafeObject();
@@ -72,6 +79,12 @@ exports.register = async (req, res) => {
     );
   } catch (error) {
     logger.error(`Registration error: ${error.message}`);
+
+    // Handle mongoose duplicate key error
+    if (error.code === 11000) {
+      return ApiResponse.conflict(res, 'An account with this email already exists');
+    }
+
     return ApiResponse.error(res, error.message);
   }
 };
@@ -116,11 +129,7 @@ exports.login = async (req, res) => {
 
     // Set cookies
     res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.cookie(
-      'refreshToken',
-      refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000)
-    );
+    res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
     const safeUser = user.toSafeObject();
 
@@ -152,8 +161,8 @@ exports.logout = async (req, res) => {
     });
 
     // Clear cookies
-    res.cookie('accessToken', '', { maxAge: 0 });
-    res.cookie('refreshToken', '', { maxAge: 0 });
+    res.cookie('accessToken', '', { ...getCookieOptions(0), maxAge: 0 });
+    res.cookie('refreshToken', '', { ...getCookieOptions(0), maxAge: 0 });
 
     logger.info(`✅ User logged out: ${req.user.email}`);
 
@@ -187,7 +196,6 @@ exports.getMe = async (req, res) => {
 // ═══════════════════════════════════════════
 exports.updateProfile = async (req, res) => {
   try {
-    // Fields allowed to be updated
     const allowedFields = [
       'firstName',
       'lastName',
@@ -203,7 +211,6 @@ exports.updateProfile = async (req, res) => {
       'preferences'
     ];
 
-    // Build update object with only allowed fields
     const updates = {};
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
@@ -211,7 +218,6 @@ exports.updateProfile = async (req, res) => {
       }
     });
 
-    // Prevent empty update
     if (Object.keys(updates).length === 0) {
       return ApiResponse.badRequest(res, 'No valid fields to update');
     }
@@ -245,44 +251,35 @@ exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    // Get user with password
     const user = await User.findById(req.user._id).select('+password');
 
     if (!user) {
       return ApiResponse.notFound(res, 'User not found');
     }
 
-    // Verify current password
     const isCurrentPasswordValid = await user.comparePassword(currentPassword);
     if (!isCurrentPasswordValid) {
       return ApiResponse.badRequest(res, 'Current password is incorrect');
     }
 
-    // Update password (pre-save hook will hash it)
     user.password = newPassword;
-
-    // Invalidate all existing refresh tokens
     user.refreshToken = '';
-
     await user.save();
 
-    // Generate new tokens
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
 
-    // Set new cookies
     res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.cookie(
-      'refreshToken',
-      refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000)
-    );
+    res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
-    // Send confirmation email
-    EmailService.sendPasswordChangedEmail(user);
+    try {
+      EmailService.sendPasswordChangedEmail(user);
+    } catch (emailErr) {
+      logger.warn(`Password changed email failed: ${emailErr.message}`);
+    }
 
     logger.info(`✅ Password changed: ${user.email}`);
 
@@ -306,7 +303,6 @@ exports.forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
 
-    // Don't reveal if email exists or not
     if (!user) {
       return ApiResponse.success(
         res,
@@ -315,15 +311,12 @@ exports.forgotPassword = async (req, res) => {
       );
     }
 
-    // Generate reset token
     const resetToken = user.generatePasswordResetToken();
     await user.save({ validateBeforeSave: false });
 
-    // Send reset email
     try {
       await EmailService.sendPasswordResetEmail(user, resetToken);
     } catch {
-      // Clear the reset token if email fails
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
       await user.save({ validateBeforeSave: false });
@@ -355,10 +348,8 @@ exports.resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    // Hash the token to compare with stored hash
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-    // Find user with valid token
     const user = await User.findOne({
       passwordResetToken: hashedToken,
       passwordResetExpires: { $gt: Date.now() }
@@ -371,28 +362,20 @@ exports.resetPassword = async (req, res) => {
       );
     }
 
-    // Set new password
     user.password = password;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
-    user.refreshToken = ''; // Invalidate all sessions
-
+    user.refreshToken = '';
     await user.save();
 
-    // Generate new tokens
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
 
-    // Set cookies
     res.cookie('accessToken', accessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.cookie(
-      'refreshToken',
-      refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000)
-    );
+    res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
     logger.info(`✅ Password reset successful: ${user.email}`);
 
@@ -417,13 +400,14 @@ exports.resetPassword = async (req, res) => {
 exports.refreshToken = async (req, res) => {
   try {
     const token =
-      req.cookies?.refreshToken || req.body?.refreshToken;
+      req.cookies?.refreshToken ||
+      req.body?.refreshToken ||
+      req.headers?.['x-refresh-token'];
 
     if (!token) {
       return ApiResponse.unauthorized(res, 'Refresh token is required');
     }
 
-    // Verify refresh token
     let decoded;
     try {
       decoded = require('jsonwebtoken').verify(
@@ -434,7 +418,6 @@ exports.refreshToken = async (req, res) => {
       return ApiResponse.unauthorized(res, 'Invalid or expired refresh token');
     }
 
-    // Find user and verify stored refresh token
     const user = await User.findById(decoded.id).select('+refreshToken');
 
     if (!user || user.refreshToken !== token) {
@@ -448,25 +431,14 @@ exports.refreshToken = async (req, res) => {
       return ApiResponse.unauthorized(res, 'Account has been deactivated');
     }
 
-    // Generate new tokens
     const newAccessToken = user.generateAccessToken();
     const newRefreshToken = user.generateRefreshToken();
 
-    // Update refresh token in DB
     user.refreshToken = newRefreshToken;
     await user.save({ validateBeforeSave: false });
 
-    // Set new cookies
-    res.cookie(
-      'accessToken',
-      newAccessToken,
-      getCookieOptions(7 * 24 * 60 * 60 * 1000)
-    );
-    res.cookie(
-      'refreshToken',
-      newRefreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000)
-    );
+    res.cookie('accessToken', newAccessToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie('refreshToken', newRefreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
     return ApiResponse.success(
       res,
